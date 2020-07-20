@@ -40,7 +40,6 @@ def go_charge():
 
     """
     time.sleep(6)
-    print("Дрон заряжен, можно лететь.")
 
 
 def check_db(login_data):
