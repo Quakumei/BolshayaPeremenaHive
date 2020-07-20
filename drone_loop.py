@@ -15,7 +15,7 @@ def calc_possibility(cargo_weight,
     # Определяет возможность поднять груз определнным типом дронов
 
     # UAV count for lifting the cargo
-    N1 = 1 + cargo_weight/drone_capacity
+    N1 = 2 + cargo_weight/drone_capacity
     # Placement opportunity calc
 #    if cargo_width/drone_width>1:
 #        N2 = (cargo_width/drone_width) * (cargo_length/drone_length)
