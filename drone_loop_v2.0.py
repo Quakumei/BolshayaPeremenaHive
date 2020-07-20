@@ -21,6 +21,7 @@ def calc_possibility(cargo_weight,
     N1 -- необходимое количество дронов для подъёма
 
     """
+    global N1
     N1 = 2 + cargo_weight/drone_capacity
     return N2>N1
 
@@ -267,12 +268,54 @@ def get_gps_location():
     """
     return 42
 
+def everything_ok():
+    """
+    Определяет отсутствие неполадок
+
+    """
+    if 1:
+        return True
+    else:
+        return False
+
+
+def send_ok_signal():
+    """
+    Отправляет сигнал соседним дронам о исправной работе
+
+    """
+    pass
+
+
+def nearby_drones_ok_count():
+    """
+    Сбор сигналов о исправной работе дронов, подсчет соседей
+
+    """
+    return 8
+
+
+def send_sos(N4):
+    """
+    Отправление сигнала команде спасателей
+
+    """
+    pass
+
+def slow_down(engine_state):
+    """
+    Замедляет полёт с сохранением направления
+
+    """
+    return engine_state
+
 
 def fly_to(target):
     """
     Лететь в сторону точки на карте до её достижения с учётом препятствий + коррекция
 
     """
+    not_okay_flag = False
     while 1:
         # Псевдокодная магия для полёта и его корректировки
 
@@ -281,8 +324,26 @@ def fly_to(target):
         drone_distances = get_drone_distances()
         obstacles = get_obstacles()
 
+        if everything_ok():
+            send_ok_signal() # Нормальное функционирование
+        else:
+            #сюда попадут сломавшиеся дроны
+            pass
+
+        #Проверка соседей
+        N3 = nearby_drones_ok_count()
+        global N1
+        if N1-1 > N3:
+            send_sos(N1-N3)
+            not_okay_flag = True
+
         #Корректировка направления движения
         engine_state = calculate_formation_correction(calculate_engines(target), drone_distances, obstacles, location)
+
+        #Замедление если что то пошло нет так
+        if not_okay_flag:
+            engine_state = slow_down(engine_state)
+
         time.sleep(4)
         break
 
@@ -389,7 +450,7 @@ def loop():
 #   /___|
 #
 
-    N1 = 2 + cargo_weight/drone_capacity #Считаем ещё раз здесь потому что костыль
+    global N1
     binded = False
     point_index = listen_for_point_index(cargo_id)
 
