@@ -73,6 +73,7 @@ def tell_others(dist,point):
 def get_swarm_closest_dist(point):
     #В течении некоторого времени собирает сообщения tell_others от других дронов
     #И выдаёт минимальное расстояние среди услышанных к точке point
+    time.sleep(3)
     return 500
 
 
@@ -88,31 +89,41 @@ def sync_route():
 
 def build_route(route):
     #Строит маршрут до адреса
-    route = [(1,1),(1,125),(125,125),(125,255),(255,255)] #route - специальный тип данных - точки на карте до которых летит дрон (координаты)
+    route = [(1, 1), (1, 125), (125, 125), (125, 255), (255, 255)] #route - специальный тип данных - точки на карте до которых летит дрон (координаты)
     return route
 
 def calculate_engines(target):
     #Счиатает необходимые значения активности пропеллеров? чтобы лететь в правильную сторону
-    return [10,10,10]
+    return [10, 10, 10]
 
-def calculate_formation_correction(engine_state, drone_distances, obstacles):
+def calculate_formation_correction(engine_state, drone_distances, obstacles, location):
     #Считает необходимые значения активности пропеллеров? + корректировка на расстояние до дронов и облет препятствий
-    return [5,20,20]
+    return [5, 20, 20]
 
 def get_drone_distances():
     #Считывает данные с устройств для определения расстояния до дронов и возвращает их
-    pass
+    return [2, 5, 5]
 
 def get_obstacles():
     #Считывает данные с устройств для определения расстояния и говорит о препятствиях (близких объектах)
-    pass
+    return 1
+
+def get_gps_location():
+    #Считывает данные с gps трекера для ориентирования на местности
+    return 42
 
 def fly_to(target):
     #Лететь в сторону точки на карте до её достижения с учётом препятствий + коррекция
     while 1:
         # Псевдокодная магия для полёта и его корректировки
-        engine_state = calculate_engines(target)
-        engine_state = calculate_formation_correction(engine_state, get_drone_distances(), get_obstacles())
+
+        #Сбор информации с датчиков
+        location = get_gps_location()
+        drone_distances = get_drone_distances()
+        obstacles = get_obstacles()
+
+        #Корректировка направления движения
+        engine_state = calculate_formation_correction(calculate_engines(target), drone_distances, obstacles, location)
         time.sleep(4)
         break
 
@@ -138,6 +149,10 @@ def reverse_route(route):
     #Возвращает обратный маршрут
     return route[::-1]
 
+def tell_cargo_state(state, login_data, cargo_id):
+    #Сообщить базе данных о изменении статуса груза
+    pass
+
 def loop():
     ##Стадия 1 - проверка готовности к полёту \ возможности доставки
 
@@ -146,7 +161,7 @@ def loop():
 
     #Проверка уровня зарядки
     energy_level = 100
-    if energy_level <= 30:
+    if energy_level <= 95:
         send_error("Дрон разряжен, летит на подзарядку...")
         go_charge()
         energy_level = 100
@@ -156,7 +171,7 @@ def loop():
     #Получение данных о грузе
     print("Получаю данные о грузе...")
     time.sleep(3)
-    address, cargo_id, cargo_weight, cargo_length, cargo_width, N2 = check_db("database:login:pass")
+    address, cargo_id, cargo_weight, cargo_length, cargo_width, N2 = check_db("login:pass@database.com")
     print("Задание получено. Проверяю возможность выполнения...")
 
     #Проверка возможности доставки груза
@@ -191,7 +206,7 @@ def loop():
             dist = calc_distance(point_index, cargo_id)
             if dist_min > dist:
                 dist_min = dist
-                closest_point = point_index
+                closest_point_index = point_index
 
         #Сказать другим
         print("Сравниваю своё расстояние с другими...")
@@ -208,13 +223,14 @@ def loop():
             bind_to_point(closest_point_index) # Присоединиться к креплению
             send_point_closed(closest_point_index) # Сказать другим дронам, что крепление успешно занято
             i_am_binded = True
+            time.sleep(2)
 
             print("Я прикреплён к грузу.")
         #Если дрон не прикрепился, то с изменением информации о занятых точках, изменится и информация которую он отдаёт другим дронам,
         #начинается новый цикл и он имеет возможность присоединиться к грузу.
 
 
-    #TODO get_free_points() выдаёт одно и то же значение --> никогда не полетит
+    #TO-DO get_free_points() выдаёт одно и то же значение --> никогда не полетит
     if i_am_binded: #Подождать пока другие дроны присоединятся к грузу
         while not cargo_ready_to_go(get_free_points()):
             print("Жду прикрепления других дронов...")
@@ -224,6 +240,7 @@ def loop():
         #сюда попадут только те дроны, что не присоединились, когда груз уже полетел
         loop() #начать новую итерацию цикла
 
+    time.sleep(2)
 
 
     ## Стадия 3 - Перелёт к адресу
@@ -234,6 +251,7 @@ def loop():
     # sync_route(address) - выбрать кратчайший на основе построений ближайших дронов
     # fly(route) - полететь по заданному маршруту, луп в котором он постоянно чекает дистанцию до других дронов и обстаклов
 
+    tell_cargo_state("Доставляется...", "login:pass@database.com", cargo_id)
     #Определяюсь с маршрутом
     route = build_route(address)
     tell_route(route)
@@ -247,8 +265,8 @@ def loop():
 
 
     ## Стадия 4 - Сброс груза и возвращение домой
-    #TODO добавить дозарядку + проверку состояния перед вылетом домой
     drop_cargo()
+    tell_cargo_state("Доставлен!", "login:pass@database.com", cargo_id)
     print("Груз успешно доставлен! Возвращаюсь на базу...")
     fly(reverse_route(best_route)) # вернуться домой по обратному маршруту
 
