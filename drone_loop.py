@@ -46,18 +46,18 @@ def check_db(login_data):
     N2 = 8 # n креплений
     return address, cargo_id, cargo_weight, cargo_length, cargo_width, N2
 
-global tick
-tick = 0
+#global tick
+#tick = 0
 
-def get_free_points():
+# def get_free_points():
     #Сигнал остальным дронам, просьба сообщить о свободных местах крепления
-    global tick
-    tick +=1
-    return [1,3,4][:-tick]
+#    global tick
+#    tick +=1
+#    return [1,3,4][:-tick]
 
 def calc_distance(point_index, cargo_id):
     #Расчёт расстояния в см до крепления point_index груза с уникальным идентификатором cargo_id
-    return point_index * 30
+    return point_index[0] * 30
 
 def cargo_ready_to_go(free_points):
     #Возвращает да, если свободных точек нет.
@@ -70,7 +70,7 @@ def tell_others(dist,point):
     #Сообщает дронам вокруг дистанцию до точки крепления
     pass
 
-def get_swarm_closest_dist(point):
+def get_swarm_closest_dist(point, cargo_id):
     #В течении некоторого времени собирает сообщения tell_others от других дронов
     #И выдаёт минимальное расстояние среди услышанных к точке point
     time.sleep(3)
@@ -153,6 +153,16 @@ def tell_cargo_state(state, login_data, cargo_id):
     #Сообщить базе данных о изменении статуса груза
     pass
 
+global tick
+tick = 0
+
+def listen_for_point_index(cargo_id):
+    global tick
+    tick+=1
+    if tick >= 4:
+        return []
+    return [tick]
+
 def loop():
     ##Стадия 1 - проверка готовности к полёту \ возможности доставки
 
@@ -182,7 +192,8 @@ def loop():
                             drone_length,
                             drone_width,
                             N2):
-        send_error("Невозможно доставить груз. Ожидание правильного груза...")
+        send_error("Невозможно доставить груз. Меняю статус груза...")
+        tell_cargo_state("Ждёт курьера", "login:pass@address.com", cargo_id)
         loop()
     else:
         print("Груз удовлетворяет возможностям дронов. Начинаю крепление!")
@@ -192,36 +203,40 @@ def loop():
 
     #Пока не прицепилось достаточно дронов
     i_am_binded = False
-    free_points = get_free_points()
-    while not (cargo_ready_to_go(free_points) or i_am_binded):
+#   free_points = get_free_points()
+    while not (cargo_ready_to_go(listen_for_point_index(cargo_id)) or i_am_binded):
 
-        print("Вычисляю расстояние до ближайшего крепления...")
+        #print("Вычисляю расстояние до ближайшего крепления...")
 
-        free_points = get_free_points()
-        dist_min = 99999999 #Большое число, больше каждого расстояния
-        closest_point_index = -1
+      #  free_points = get_free_points()
+       # dist_min = 99999999 #Большое число, больше каждого расстояния
+        #closest_point_index = -1
 
         #Рассчет ближайшейшего места крепления *относительно дрона* и расстояния до него
-        for point_index in free_points:
-            dist = calc_distance(point_index, cargo_id)
-            if dist_min > dist:
-                dist_min = dist
-                closest_point_index = point_index
+        #for point_index in free_points:
+         #   dist = calc_distance(point_index, cargo_id)
+          #  if dist_min > dist:
+           #     dist_min = dist
+            #    closest_point_index = point_index
 
         #Сказать другим
-        print("Сравниваю своё расстояние с другими...")
+       # print("Сравниваю своё расстояние с другими...")
 
-        tell_others(dist_min, closest_point_index) #Отправляет информацию рою о ближайшем месте крепления
-        closest_dist = get_swarm_closest_dist(closest_point_index) #В течении некоторого времени этот метод собирает информацию с tell_others() других дронов
+  #      tell_others(dist_min, closest_point_index) #Отправляет информацию рою о ближайшем месте крепления
+ #       closest_dist = get_swarm_closest_dist(closest_point_index) #В течении некоторого времени этот метод собирает информацию с tell_others() других дронов
+
+        point_index = listen_for_point_index(cargo_id) #Получить текущую точку крепления
+        point_distance = calc_distance(point_index, cargo_id)
+        closest_dist = get_swarm_closest_dist(point_index, cargo_id)
 
 
 
-        if closest_dist >= dist_min: #Если минимальное расстояние совпадает с тем что посчитал сам дрон, то значит что он является и ближе всех.
+        if closest_dist >= point_distance: #Если минимальное расстояние совпадает с тем что посчитал сам дрон, то значит что он является и ближе всех.
 
             print("Я ближе всех! Прикрепляюсь...")
 
-            bind_to_point(closest_point_index) # Присоединиться к креплению
-            send_point_closed(closest_point_index) # Сказать другим дронам, что крепление успешно занято
+            bind_to_point(point_index) # Присоединиться к креплению
+            send_point_closed(point_index) # Сказать другим дронам, что крепление успешно занято
             i_am_binded = True
             time.sleep(2)
 
@@ -232,7 +247,7 @@ def loop():
 
     #TO-DO get_free_points() выдаёт одно и то же значение --> никогда не полетит
     if i_am_binded: #Подождать пока другие дроны присоединятся к грузу
-        while not cargo_ready_to_go(get_free_points()):
+        while not cargo_ready_to_go(listen_for_point_index(cargo_id)):
             print("Жду прикрепления других дронов...")
             time.sleep(5)
     else:
